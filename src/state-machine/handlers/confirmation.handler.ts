@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import type { StateMachineContext } from "../types";
+import { ConflictError } from "../../http/errors";
 
 export async function handleConfirmation(context: StateMachineContext) {
   const answer = context.message.text.trim().toLowerCase();
@@ -66,36 +67,91 @@ export async function handleConfirmation(context: StateMachineContext) {
     return;
   }
 
+  const latestSlots = await context.calendar.findAvailableSlots(
+    context.tenant,
+    service.durationMinutes,
+    20
+  );
+  const selectedStart = context.conversation.selectedSlotStart.toISOString();
+  const selectedEnd = context.conversation.selectedSlotEnd.toISOString();
+  const stillAvailable = latestSlots.some(slot =>
+    slot.start === selectedStart && slot.end === selectedEnd
+  );
+
+  if (!stillAvailable) {
+    const refreshed = await context.conversations.updateOptimistic(
+      context.conversation.id,
+      context.conversation.version,
+      {
+        step: "SLOT_LOOKUP",
+        availableSlots: latestSlots,
+        selectedSlotStart: null,
+        selectedSlotEnd: null,
+        lastInboundMessageId: context.message.id
+      }
+    );
+
+    const slotLines = latestSlots
+      .slice(0, 5)
+      .map((slot, index) => `${index + 1}. ${formatSlot(slot.start, context.tenant.timezone)}`)
+      .join("\n");
+
+    await context.whatsapp.sendText({
+      tenant: context.tenant,
+      recipientPhone: context.message.from,
+      text: slotLines
+        ? `That slot is no longer available. Please choose another:\n${slotLines}`
+        : "That slot is no longer available and no replacement slots were found."
+    });
+
+    return refreshed;
+  }
+
   const parameters = isRecord(context.conversation.collectedParameters)
     ? context.conversation.collectedParameters
     : {};
 
-  const eventId = await context.calendar.createBookingEvent({
-    tenant: context.tenant,
-    serviceName: service.name,
-    customerName: context.conversation.customerName ?? context.message.customerName,
+  let booking = await context.bookings.create({
+    tenantId: context.tenant.id,
+    serviceId: service.id,
     customerPhone: context.message.from,
-    parameters,
+    customerName: context.conversation.customerName ?? context.message.customerName,
+    customerParameters: parameters as Prisma.InputJsonValue,
+    status: "PENDING",
+    calendarEventId: null,
     startAt: context.conversation.selectedSlotStart,
     endAt: context.conversation.selectedSlotEnd,
     priceMinor: context.conversation.quotedPriceMinor,
     currency: service.currency
   });
 
+  let eventId: string;
+
   try {
-    const booking = await context.bookings.create({
-      tenantId: context.tenant.id,
+    eventId = await context.calendar.createBookingEvent({
+      tenant: context.tenant,
+      bookingId: booking.id,
       serviceId: service.id,
-      customerPhone: context.message.from,
+      serviceName: service.name,
       customerName: context.conversation.customerName ?? context.message.customerName,
-      customerParameters: parameters as Prisma.InputJsonValue,
-      status: "CONFIRMED",
-      calendarEventId: eventId,
+      customerPhone: context.message.from,
+      parameters,
       startAt: context.conversation.selectedSlotStart,
       endAt: context.conversation.selectedSlotEnd,
       priceMinor: context.conversation.quotedPriceMinor,
       currency: service.currency
     });
+  } catch (error) {
+    await context.bookings.deleteForTenant(context.tenant.id, booking.id);
+    throw error;
+  }
+
+  try {
+    booking = await context.bookings.confirmForTenant(
+      context.tenant.id,
+      booking.id,
+      eventId
+    );
 
     await context.conversations.updateOptimistic(
       context.conversation.id,
@@ -128,8 +184,22 @@ export async function handleConfirmation(context: StateMachineContext) {
     }
   } catch (error) {
     await context.calendar.deleteBookingEvent(context.tenant, eventId);
+    await context.bookings.deleteForTenant(context.tenant.id, booking.id);
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new ConflictError("The selected time was booked by another customer");
+    }
+
     throw error;
   }
+}
+
+function formatSlot(value: string, timezone: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: timezone,
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(value));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
