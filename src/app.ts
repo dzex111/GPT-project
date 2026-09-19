@@ -27,17 +27,12 @@ const corsOrigins = env.CORS_ORIGINS
 app.use(cors({
   credentials: true,
   origin: (origin, callback) => {
-    if (!origin) {
+    if (!origin || corsOrigins.includes(origin)) {
       callback(null, true);
       return;
     }
 
-    if (corsOrigins.includes(origin)) {
-      callback(null, true);
-      return;
-    }
-
-    callback(new Error("Origin not allowed"));
+    callback(null, false);
   }
 }));
 
@@ -52,18 +47,20 @@ app.use(express.json({
 
 app.get(
   "/health",
-  asyncHandler(async (_request, response) => {
+  asyncHandler(async (request, response) => {
     try {
       await prisma.$queryRaw`SELECT 1`;
       response.status(200).json({
         status: "ok",
-        database: "ok"
+        database: "ok",
+        correlationId: request.correlationId
       });
     } catch (error) {
-      logger.error({ err: error }, "Database health check failed");
+      request.log?.error({ err: error }, "health.database_unavailable");
       response.status(503).json({
         status: "degraded",
-        database: "unavailable"
+        database: "unavailable",
+        correlationId: request.correlationId
       });
     }
   })
