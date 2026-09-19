@@ -27,8 +27,8 @@ export class AnalyticsService {
       bookingCount,
       bookingStatusGroups,
       conversationGroups,
-      activeUsers,
-      recentCustomers
+      activeCustomerRows,
+      recentCustomerRows
     ] = await Promise.all([
       prisma.booking.aggregate({
         where: {
@@ -58,13 +58,17 @@ export class AnalyticsService {
           _all: true
         }
       }),
-      prisma.conversationState.count({
+      prisma.conversationState.findMany({
         where: {
           tenantId,
           updatedAt: {
             gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
           }
-        }
+        },
+        select: {
+          customerPhone: true
+        },
+        distinct: ["customerPhone"]
       }),
       prisma.booking.findMany({
         where: bookingWhere,
@@ -85,7 +89,6 @@ export class AnalyticsService {
       countStep(conversationGroups, "SLOT_LOOKUP") +
       countStep(conversationGroups, "AWAITING_CONFIRMATION") +
       bookedConversations;
-
     const slotConversations =
       countStep(conversationGroups, "SLOT_LOOKUP") +
       countStep(conversationGroups, "AWAITING_CONFIRMATION") +
@@ -109,8 +112,8 @@ export class AnalyticsService {
         bookingConversionRate: percentage(bookedConversations, totalConversations)
       },
       activeUsers: {
-        conversationsLast30Days: activeUsers,
-        uniqueCustomersInRange: recentCustomers.length
+        uniqueCustomersLast30Days: activeCustomerRows.length,
+        uniqueCustomersInRange: recentCustomerRows.length
       }
     };
   }
