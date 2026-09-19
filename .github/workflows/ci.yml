@@ -12,7 +12,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      NETLIFY_DB_URL: postgresql://postgres:postgres@localhost:5432/gcc_booking
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/gcc_booking
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/gcc_booking
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
