@@ -20,6 +20,7 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@netlify/aws-lambda-compat": "^2.0.0",
     "@netlify/database": "^1.0.0",
     "@prisma/client": "^6.16.2",
     "bcrypt": "^6.0.0",
