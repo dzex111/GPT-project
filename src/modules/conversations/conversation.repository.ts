@@ -1,6 +1,7 @@
+import { Prisma } from "@prisma/client";
+import type { ConversationStep } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { ConflictError } from "../../http/errors";
-import type { ConversationStep, Prisma } from "@prisma/client";
 
 export class ConversationRepository {
   async findOrCreate(tenantId: string, customerPhone: string, customerName?: string) {
