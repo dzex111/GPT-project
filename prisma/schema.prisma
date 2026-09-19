@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum ConversationStep {
+  SERVICE_SELECTION
+  PARAMETER_COLLECTION
+  QUOTING
+  SLOT_LOOKUP
+  AWAITING_CONFIRMATION
+  BOOKED
+}
+
+model Tenant {
+  id                            String             @id @default(cuid())
+  businessName                  String
+  businessType                  String
+  countryCode                   String
+  phoneNumber                   String             @unique
+  whatsappPhoneNumberId         String             @unique
+  whatsappAccessToken           String
+  whatsappVerifyToken           String             @unique
+  whatsappAppSecret             String?
+  googleCalendarId              String?
+  googleServiceAccountEmail     String?
+  googleServiceAccountPrivateKey String?
+  timezone                      String             @default("Asia/Riyadh")
+  currency                      String             @default("SAR")
+  adminNotificationPhone        String?
+  businessHours                 Json?
+  createdAt                     DateTime           @default(now())
+  updatedAt                     DateTime           @updatedAt
+  services                      Service[]
+  bookings                      Booking[]
+  conversations                ConversationState[]
+
+  @@index([businessType])
+  @@index([countryCode])
+}
+
+model Service {
+  id              String      @id @default(cuid())
+  tenantId        String
+  name            String
+  basePriceMinor  Int
+  durationMinutes Int
+  currency        String
+  parameters      Json
+  active          Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  tenant          Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bookings        Booking[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, active])
+}
+
+model Booking {
+  id                 String        @id @default(cuid())
+  tenantId           String
+  serviceId          String
+  customerPhone      String
+  customerName       String?
+  customerEmail      String?
+  customerParameters Json
+  status             BookingStatus @default(PENDING)
+  calendarEventId    String?       @unique
+  startAt            DateTime
+  endAt              DateTime
+  priceMinor         Int
+  currency           String
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  tenant             Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  service            Service       @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, startAt])
+  @@index([tenantId, status])
+  @@index([tenantId, customerPhone])
+  @@index([tenantId, startAt, endAt])
+}
+
+model ConversationState {
+  id                   String           @id @default(cuid())
+  tenantId             String
+  customerPhone        String
+  customerName         String?
+  step                 ConversationStep @default(SERVICE_SELECTION)
+  serviceId            String?
+  collectedParameters  Json?
+  quotedPriceMinor     Int?
+  selectedSlotStart    DateTime?
+  selectedSlotEnd      DateTime?
+  availableSlots       Json?
+  bookingId            String?
+  lastInboundMessageId String?
+  version              Int              @default(0)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  tenant               Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, customerPhone])
+  @@unique([tenantId, lastInboundMessageId])
+  @@index([tenantId, step])
+  @@index([tenantId, updatedAt])
+}
