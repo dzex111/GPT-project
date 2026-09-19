@@ -82,19 +82,27 @@ export const updateService = asyncHandler(async (request: Request, response: Res
     throw new NotFoundError("Service not found");
   }
 
-  const result = await services.updateForTenant(
-    tenantId,
-    existing.id,
-    {
-      ...parsed.data,
-      ...(parsed.data.parameters
-        ? { parameters: parsed.data.parameters as Prisma.InputJsonValue }
-        : {})
-    }
-  );
+  try {
+    const result = await services.updateForTenant(
+      tenantId,
+      existing.id,
+      {
+        ...parsed.data,
+        ...(parsed.data.parameters
+          ? { parameters: parsed.data.parameters as Prisma.InputJsonValue }
+          : {})
+      }
+    );
 
-  if (result.count !== 1) {
-    throw new NotFoundError("Service not found");
+    if (result.count !== 1) {
+      throw new NotFoundError("Service not found");
+    }
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new ConflictError("A service with this name already exists for the tenant");
+    }
+
+    throw error;
   }
 
   const updated = await services.findAnyByIdForTenant(
