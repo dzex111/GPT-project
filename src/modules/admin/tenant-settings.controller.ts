@@ -22,15 +22,21 @@ export const updateTenantSettings = asyncHandler(async (request: Request, respon
     throw new NotFoundError("Tenant not found");
   }
 
-  const { tenantId: _tenantId, ...settings } = parsed.data;
+  const {
+    tenantId: _tenantId,
+    autoQuoteParameters,
+    ...settings
+  } = parsed.data;
+
+  const data: Prisma.TenantUpdateInput = {
+    ...settings,
+    ...(autoQuoteParameters !== undefined
+      ? { autoQuoteParameters: autoQuoteParameters as Prisma.InputJsonValue }
+      : {})
+  };
 
   try {
-    const tenant = await tenants.updateById(tenantId, {
-      ...settings,
-      ...(settings.autoQuoteParameters
-        ? { autoQuoteParameters: settings.autoQuoteParameters as Prisma.InputJsonValue }
-        : {})
-    });
+    const tenant = await tenants.updateById(tenantId, data);
 
     response.json({
       data: serializeTenantSettings(tenant)
