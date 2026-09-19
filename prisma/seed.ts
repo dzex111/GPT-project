@@ -1,7 +1,10 @@
 import "dotenv/config";
+import bcrypt from "bcrypt";
+import crypto from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
+const SALT_ROUNDS = 12;
 
 const businessHours = {
   "0": null,
@@ -27,6 +30,10 @@ const tenantInput = {
   bookingBufferMinutes: 15,
   adminNotificationPhone: process.env.SEED_ADMIN_NOTIFICATION_PHONE ?? null,
   businessHours,
+  autoQuoteParameters: {
+    defaultSlotIntervalMinutes: 30,
+    defaultCurrency: "SAR"
+  },
   googleCalendarId: process.env.SEED_GOOGLE_CALENDAR_ID ?? null,
   googleServiceAccountEmail: process.env.SEED_GOOGLE_SERVICE_ACCOUNT_EMAIL ?? null,
   googleServiceAccountPrivateKey: process.env.SEED_GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY ?? null,
@@ -49,24 +56,13 @@ async function main() {
       bookingBufferMinutes: tenantInput.bookingBufferMinutes,
       adminNotificationPhone: tenantInput.adminNotificationPhone,
       businessHours: tenantInput.businessHours,
-      ...(tenantInput.googleCalendarId
-        ? { googleCalendarId: tenantInput.googleCalendarId }
-        : {}),
-      ...(tenantInput.googleServiceAccountEmail
-        ? { googleServiceAccountEmail: tenantInput.googleServiceAccountEmail }
-        : {}),
-      ...(tenantInput.googleServiceAccountPrivateKey
-        ? { googleServiceAccountPrivateKey: tenantInput.googleServiceAccountPrivateKey }
-        : {}),
-      ...(tenantInput.googleOAuthClientId
-        ? { googleOAuthClientId: tenantInput.googleOAuthClientId }
-        : {}),
-      ...(tenantInput.googleOAuthClientSecret
-        ? { googleOAuthClientSecret: tenantInput.googleOAuthClientSecret }
-        : {}),
-      ...(tenantInput.googleOAuthRefreshToken
-        ? { googleOAuthRefreshToken: tenantInput.googleOAuthRefreshToken }
-        : {})
+      autoQuoteParameters: tenantInput.autoQuoteParameters,
+      ...(tenantInput.googleCalendarId ? { googleCalendarId: tenantInput.googleCalendarId } : {}),
+      ...(tenantInput.googleServiceAccountEmail ? { googleServiceAccountEmail: tenantInput.googleServiceAccountEmail } : {}),
+      ...(tenantInput.googleServiceAccountPrivateKey ? { googleServiceAccountPrivateKey: tenantInput.googleServiceAccountPrivateKey } : {}),
+      ...(tenantInput.googleOAuthClientId ? { googleOAuthClientId: tenantInput.googleOAuthClientId } : {}),
+      ...(tenantInput.googleOAuthClientSecret ? { googleOAuthClientSecret: tenantInput.googleOAuthClientSecret } : {}),
+      ...(tenantInput.googleOAuthRefreshToken ? { googleOAuthRefreshToken: tenantInput.googleOAuthRefreshToken } : {})
     },
     create: tenantInput
   });
@@ -197,7 +193,85 @@ async function main() {
     });
   }
 
+  const superAdmin = await seedUser({
+    email: process.env.SEED_SUPER_ADMIN_EMAIL,
+    password: process.env.SEED_SUPER_ADMIN_PASSWORD,
+    role: "SUPER_ADMIN",
+    name: "Platform Super Admin"
+  });
+
+  const tenantAdmin = await seedUser({
+    email: process.env.SEED_TENANT_ADMIN_EMAIL,
+    password: process.env.SEED_TENANT_ADMIN_PASSWORD,
+    role: "TENANT_ADMIN",
+    name: "Gulf Auto Admin",
+    tenantId: tenant.id
+  });
+
+  const apiKey = process.env.SEED_INTERNAL_API_KEY;
+
+  if (apiKey && (tenantAdmin ?? superAdmin)) {
+    const keyHash = crypto.createHash("sha256").update(apiKey).digest("hex");
+    const prefix = apiKey.slice(0, 12);
+
+    await prisma.apiKey.upsert({
+      where: {
+        prefix
+      },
+      update: {
+        keyHash,
+        active: true,
+        tenantId: tenantAdmin ? tenant.id : null,
+        createdByUserId: (tenantAdmin ?? superAdmin)!.id,
+        name: "Seeded internal service key"
+      },
+      create: {
+        prefix,
+        keyHash,
+        active: true,
+        tenantId: tenantAdmin ? tenant.id : null,
+        createdByUserId: (tenantAdmin ?? superAdmin)!.id,
+        name: "Seeded internal service key"
+      }
+    });
+  }
+
   console.log(`Seeded tenant ${tenant.id} with ${services.length} services.`);
+}
+
+async function seedUser(input: {
+  email?: string;
+  password?: string;
+  role: "SUPER_ADMIN" | "TENANT_ADMIN";
+  name: string;
+  tenantId?: string;
+}) {
+  if (!input.email || !input.password) {
+    return null;
+  }
+
+  const passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
+
+  return prisma.user.upsert({
+    where: {
+      email: input.email.toLowerCase()
+    },
+    update: {
+      passwordHash,
+      role: input.role,
+      name: input.name,
+      tenantId: input.tenantId ?? null,
+      active: true
+    },
+    create: {
+      email: input.email.toLowerCase(),
+      passwordHash,
+      role: input.role,
+      name: input.name,
+      tenantId: input.tenantId ?? null,
+      active: true
+    }
+  });
 }
 
 main()
