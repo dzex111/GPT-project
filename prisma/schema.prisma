@@ -23,6 +23,11 @@ enum ConversationStep {
   BOOKED
 }
 
+enum UserRole {
+  SUPER_ADMIN
+  TENANT_ADMIN
+}
+
 model Tenant {
   id                            String             @id @default(cuid())
   businessName                  String
@@ -44,11 +49,14 @@ model Tenant {
   bookingBufferMinutes          Int                @default(15)
   adminNotificationPhone        String?
   businessHours                 Json?
+  autoQuoteParameters           Json?
   createdAt                     DateTime           @default(now())
   updatedAt                     DateTime           @updatedAt
   services                      Service[]
   bookings                      Booking[]
   conversations                ConversationState[]
+  users                         User[]
+  apiKeys                       ApiKey[]
 
   @@index([businessType])
   @@index([countryCode])
@@ -120,4 +128,55 @@ model ConversationState {
   @@unique([tenantId, lastInboundMessageId])
   @@index([tenantId, step])
   @@index([tenantId, updatedAt])
+}
+
+model User {
+  id             String       @id @default(cuid())
+  tenantId       String?
+  email          String       @unique
+  passwordHash   String
+  role           UserRole
+  name           String?
+  active         Boolean      @default(true)
+  lastLoginAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  tenant         Tenant?      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  refreshSessions RefreshSession[]
+  createdApiKeys ApiKey[]    @relation("ApiKeyCreator")
+
+  @@index([tenantId, role])
+  @@index([active])
+}
+
+model RefreshSession {
+  id          String    @id @default(cuid())
+  userId      String
+  jti         String    @unique
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([revokedAt])
+}
+
+model ApiKey {
+  id             String    @id @default(cuid())
+  tenantId       String?
+  createdByUserId String
+  name           String
+  prefix         String    @unique
+  keyHash        String    @unique
+  active         Boolean   @default(true)
+  lastUsedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  tenant         Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdByUser  User      @relation("ApiKeyCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, active])
+  @@index([active])
 }
