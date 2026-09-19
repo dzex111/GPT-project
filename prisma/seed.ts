@@ -23,8 +23,8 @@ const tenantInput = {
   phoneNumber: "966500000000",
   whatsappPhoneNumberId: "demo-gulf-auto-phone-id",
   whatsappAccessToken: process.env.SEED_WHATSAPP_ACCESS_TOKEN ?? "demo-access-token",
-  whatsappVerifyToken: process.env.SEED_WHATSAPP_VERIFY_TOKEN ?? "demo-gulf-auto-verify",
-  whatsappAppSecret: process.env.SEED_WHATSAPP_APP_SECRET ?? "demo-gulf-auto-app-secret",
+  whatsappVerifyToken: process.env.SEED_WHATSAPP_VERIFY_TOKEN ?? process.env.META_VERIFY_TOKEN ?? "demo-gulf-auto-verify",
+  whatsappAppSecret: process.env.SEED_WHATSAPP_APP_SECRET ?? process.env.META_APP_SECRET ?? "demo-gulf-auto-app-secret",
   timezone: "Asia/Riyadh",
   currency: "SAR",
   bookingBufferMinutes: 15,
@@ -35,8 +35,8 @@ const tenantInput = {
     defaultCurrency: "SAR"
   },
   googleCalendarId: process.env.SEED_GOOGLE_CALENDAR_ID ?? null,
-  googleServiceAccountEmail: process.env.SEED_GOOGLE_SERVICE_ACCOUNT_EMAIL ?? null,
-  googleServiceAccountPrivateKey: process.env.SEED_GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY ?? null,
+  googleServiceAccountEmail: process.env.SEED_GOOGLE_SERVICE_ACCOUNT_EMAIL ?? process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ?? null,
+  googleServiceAccountPrivateKey: process.env.SEED_GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY ?? process.env.GOOGLE_PRIVATE_KEY ?? null,
   googleOAuthClientId: process.env.SEED_GOOGLE_OAUTH_CLIENT_ID ?? null,
   googleOAuthClientSecret: process.env.SEED_GOOGLE_OAUTH_CLIENT_SECRET ?? null,
   googleOAuthRefreshToken: process.env.SEED_GOOGLE_OAUTH_REFRESH_TOKEN ?? null
