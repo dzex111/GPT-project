@@ -119,6 +119,59 @@ export class BookingRepository {
     });
   }
 
+  async updateStatusForTenant(
+    tenantId: string,
+    bookingId: string,
+    status: BookingStatus
+  ) {
+    const result = await prisma.booking.updateMany({
+      where: {
+        id: bookingId,
+        tenantId
+      },
+      data: {
+        status
+      }
+    });
+
+    if (result.count !== 1) {
+      return null;
+    }
+
+    return prisma.booking.findUnique({
+      where: { id: bookingId }
+    });
+  }
+
+  async updateScheduleForTenant(
+    tenantId: string,
+    bookingId: string,
+    startAt: Date,
+    endAt: Date
+  ) {
+    const result = await prisma.booking.updateMany({
+      where: {
+        id: bookingId,
+        tenantId,
+        status: {
+          in: ["PENDING", "CONFIRMED"]
+        }
+      },
+      data: {
+        startAt,
+        endAt
+      }
+    });
+
+    if (result.count !== 1) {
+      return null;
+    }
+
+    return prisma.booking.findUnique({
+      where: { id: bookingId }
+    });
+  }
+
   async cancelForTenant(tenantId: string, bookingId: string) {
     const result = await prisma.booking.updateMany({
       where: {
