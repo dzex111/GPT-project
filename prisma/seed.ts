@@ -26,16 +26,13 @@ const tenantInput = {
   currency: "SAR",
   bookingBufferMinutes: 15,
   adminNotificationPhone: process.env.SEED_ADMIN_NOTIFICATION_PHONE ?? null,
-  businessHours
-};
-
-const optionalCredentials = {
-  googleCalendarId: process.env.SEED_GOOGLE_CALENDAR_ID,
-  googleServiceAccountEmail: process.env.SEED_GOOGLE_SERVICE_ACCOUNT_EMAIL,
-  googleServiceAccountPrivateKey: process.env.SEED_GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
-  googleOAuthClientId: process.env.SEED_GOOGLE_OAUTH_CLIENT_ID,
-  googleOAuthClientSecret: process.env.SEED_GOOGLE_OAUTH_CLIENT_SECRET,
-  googleOAuthRefreshToken: process.env.SEED_GOOGLE_OAUTH_REFRESH_TOKEN
+  businessHours,
+  googleCalendarId: process.env.SEED_GOOGLE_CALENDAR_ID ?? null,
+  googleServiceAccountEmail: process.env.SEED_GOOGLE_SERVICE_ACCOUNT_EMAIL ?? null,
+  googleServiceAccountPrivateKey: process.env.SEED_GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY ?? null,
+  googleOAuthClientId: process.env.SEED_GOOGLE_OAUTH_CLIENT_ID ?? null,
+  googleOAuthClientSecret: process.env.SEED_GOOGLE_OAUTH_CLIENT_SECRET ?? null,
+  googleOAuthRefreshToken: process.env.SEED_GOOGLE_OAUTH_REFRESH_TOKEN ?? null
 };
 
 async function main() {
@@ -52,23 +49,23 @@ async function main() {
       bookingBufferMinutes: tenantInput.bookingBufferMinutes,
       adminNotificationPhone: tenantInput.adminNotificationPhone,
       businessHours: tenantInput.businessHours,
-      ...(optionalCredentials.googleCalendarId
-        ? { googleCalendarId: optionalCredentials.googleCalendarId }
+      ...(tenantInput.googleCalendarId
+        ? { googleCalendarId: tenantInput.googleCalendarId }
         : {}),
-      ...(optionalCredentials.googleServiceAccountEmail
-        ? { googleServiceAccountEmail: optionalCredentials.googleServiceAccountEmail }
+      ...(tenantInput.googleServiceAccountEmail
+        ? { googleServiceAccountEmail: tenantInput.googleServiceAccountEmail }
         : {}),
-      ...(optionalCredentials.googleServiceAccountPrivateKey
-        ? { googleServiceAccountPrivateKey: optionalCredentials.googleServiceAccountPrivateKey }
+      ...(tenantInput.googleServiceAccountPrivateKey
+        ? { googleServiceAccountPrivateKey: tenantInput.googleServiceAccountPrivateKey }
         : {}),
-      ...(optionalCredentials.googleOAuthClientId
-        ? { googleOAuthClientId: optionalCredentials.googleOAuthClientId }
+      ...(tenantInput.googleOAuthClientId
+        ? { googleOAuthClientId: tenantInput.googleOAuthClientId }
         : {}),
-      ...(optionalCredentials.googleOAuthClientSecret
-        ? { googleOAuthClientSecret: optionalCredentials.googleOAuthClientSecret }
+      ...(tenantInput.googleOAuthClientSecret
+        ? { googleOAuthClientSecret: tenantInput.googleOAuthClientSecret }
         : {}),
-      ...(optionalCredentials.googleOAuthRefreshToken
-        ? { googleOAuthRefreshToken: optionalCredentials.googleOAuthRefreshToken }
+      ...(tenantInput.googleOAuthRefreshToken
+        ? { googleOAuthRefreshToken: tenantInput.googleOAuthRefreshToken }
         : {})
     },
     create: tenantInput
