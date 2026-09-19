@@ -33,7 +33,7 @@ export async function handleQuoting(context: StateMachineContext) {
     context.conversation.id,
     context.conversation.version,
     {
-      step: "SLOT_LOOKUP",
+      step: slots.length === 0 ? "QUOTING" : "SLOT_LOOKUP",
       quotedPriceMinor: priceMinor,
       availableSlots: slots,
       lastInboundMessageId: context.message.id
