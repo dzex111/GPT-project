@@ -38,10 +38,12 @@ export class ConversationRepository {
       lastInboundMessageId?: string | null;
     }
   ) {
+    const { availableSlots, ...rest } = data;
     const result = await prisma.conversationState.updateMany({
       where: { id, version },
       data: {
-        ...data,
+        ...rest,
+        availableSlots: availableSlots === null ? Prisma.JsonNull : availableSlots,
         version: { increment: 1 }
       }
     });
