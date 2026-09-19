@@ -36,15 +36,19 @@ model Tenant {
   googleCalendarId              String?
   googleServiceAccountEmail     String?
   googleServiceAccountPrivateKey String?
+  googleOAuthClientId           String?
+  googleOAuthClientSecret       String?
+  googleOAuthRefreshToken       String?
   timezone                      String             @default("Asia/Riyadh")
   currency                      String             @default("SAR")
+  bookingBufferMinutes          Int                @default(15)
   adminNotificationPhone        String?
   businessHours                 Json?
   createdAt                     DateTime           @default(now())
   updatedAt                     DateTime           @updatedAt
   services                      Service[]
   bookings                      Booking[]
-  conversations                 ConversationState[]
+  conversations                ConversationState[]
 
   @@index([businessType])
   @@index([countryCode])
