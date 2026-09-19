@@ -1,6 +1,6 @@
 {
   "name": "gcc-whatsapp-booking-engine",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "engines": {
     "node": ">=20.0.0"
@@ -21,16 +21,21 @@
   },
   "dependencies": {
     "@prisma/client": "^6.16.2",
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "express": "^5.1.0",
     "express-rate-limit": "^8.2.1",
     "googleapis": "^159.0.0",
+    "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "luxon": "^3.7.2",
     "pino": "^9.10.0",
     "zod": "^4.1.8"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/luxon": "^3.6.2",
