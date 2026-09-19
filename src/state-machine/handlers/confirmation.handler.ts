@@ -111,19 +111,29 @@ export async function handleConfirmation(context: StateMachineContext) {
     ? context.conversation.collectedParameters
     : {};
 
-  let booking = await context.bookings.create({
-    tenantId: context.tenant.id,
-    serviceId: service.id,
-    customerPhone: context.message.from,
-    customerName: context.conversation.customerName ?? context.message.customerName,
-    customerParameters: parameters as Prisma.InputJsonValue,
-    status: "PENDING",
-    calendarEventId: null,
-    startAt: context.conversation.selectedSlotStart,
-    endAt: context.conversation.selectedSlotEnd,
-    priceMinor: context.conversation.quotedPriceMinor,
-    currency: service.currency
-  });
+  let booking;
+
+  try {
+    booking = await context.bookings.create({
+      tenantId: context.tenant.id,
+      serviceId: service.id,
+      customerPhone: context.message.from,
+      customerName: context.conversation.customerName ?? context.message.customerName,
+      customerParameters: parameters as Prisma.InputJsonValue,
+      status: "PENDING",
+      calendarEventId: null,
+      startAt: context.conversation.selectedSlotStart,
+      endAt: context.conversation.selectedSlotEnd,
+      priceMinor: context.conversation.quotedPriceMinor,
+      currency: service.currency
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new ConflictError("The selected time was booked by another customer");
+    }
+
+    throw error;
+  }
 
   let eventId: string;
 
