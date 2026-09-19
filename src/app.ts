@@ -1,16 +1,47 @@
 import express from "express";
+import cors from "cors";
+import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { env } from "./config/env";
 import { logger } from "./config/logger";
 import { prisma } from "./config/prisma";
-import { AppError } from "./http/errors";
-import { whatsappRouter } from "./routes/whatsapp.routes";
-import { adminRouter } from "./modules/admin/admin.routes";
 import { asyncHandler } from "./http/async-handler";
+import { errorHandler } from "./http/error-handler";
+import { requestContext } from "./http/request-context.middleware";
+import { whatsappRouter } from "./routes/whatsapp.routes";
+import { internalRouter } from "./routes/internal.routes";
+import { adminRouter } from "./modules/admin/admin.routes";
+import { authRouter } from "./modules/auth/auth.routes";
 
 export const app = express();
 
 app.disable("x-powered-by");
+
+app.use(helmet());
+
+const corsOrigins = env.CORS_ORIGINS
+  .split(",")
+  .map(value => value.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  credentials: true,
+  origin: (origin, callback) => {
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+
+    if (corsOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error("Origin not allowed"));
+  }
+}));
+
+app.use(requestContext);
 
 app.use(express.json({
   limit: "256kb",
@@ -49,20 +80,8 @@ app.use(
   whatsappRouter
 );
 
+app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/admin", adminRouter);
+app.use("/api/v1/internal", internalRouter);
 
-app.use((error: unknown, _request: express.Request, response: express.Response, _next: express.NextFunction) => {
-  if (error instanceof AppError) {
-    response.status(error.statusCode).json({
-      error: error.code,
-      message: error.message
-    });
-    return;
-  }
-
-  logger.error({ err: error }, "Unhandled application error");
-  response.status(500).json({
-    error: "INTERNAL_SERVER_ERROR",
-    message: "Internal server error"
-  });
-});
+app.use(errorHandler);
