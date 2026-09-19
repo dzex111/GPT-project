@@ -2,11 +2,21 @@
 
 Multi-tenant WhatsApp booking and auto-quotation engine for local service businesses in Saudi Arabia and the UAE.
 
+## Stack
+
+- Node.js 20+
+- TypeScript
+- Express 5
+- Prisma
+- PostgreSQL
+- Meta WhatsApp Cloud API
+- Google Calendar API
+- Pino
+- Zod
+- JWT
+- bcrypt
+
 ## Architecture
-
-The codebase uses Express, TypeScript, Prisma, PostgreSQL, Meta WhatsApp Cloud API, Google Calendar, and a state-machine driven conversation layer.
-
-## Directory layout
 
 ```text
 src/
@@ -17,6 +27,7 @@ src/
     whatsapp/
   modules/
     admin/
+    auth/
     bookings/
     conversations/
     services/
@@ -30,163 +41,289 @@ prisma/
   migrations/
   schema.prisma
   seed.ts
+.github/
+  workflows/
+    ci.yml
 ```
 
-## Conversation flow
+## Authentication
+
+Authentication is based on signed JWT access tokens and rotating JWT refresh tokens.
+
+Roles:
 
 ```text
-SERVICE_SELECTION
-  -> PARAMETER_COLLECTION
-  -> QUOTING
-  -> SLOT_LOOKUP
-  -> AWAITING_CONFIRMATION
-  -> BOOKED
+SUPER_ADMIN
+TENANT_ADMIN
 ```
 
-## Dynamic pricing
+A SUPER_ADMIN can operate on any tenant when a tenantId is supplied.
 
-Each service stores fields and pricing rules in Service.parameters.
+A TENANT_ADMIN is permanently scoped to the tenantId stored in the token. Cross-tenant access is rejected.
 
-Amounts use integer minor currency units.
+Login:
 
-## Calendar integration
+```text
+POST /api/v1/auth/login
+Content-Type: application/json
 
-Google Calendar authentication supports:
-
-- Per-tenant service account JWT credentials
-- Per-tenant OAuth2 refresh token credentials
-- Optional environment-level OAuth2 fallback
-
-The calendar service queries Google free/busy data, applies tenant business hours, expands busy intervals by booking buffer time, and returns bookable slots.
-
-Confirmed bookings create Calendar events with customer data plus private metadata containing tenant, booking, service, customer phone, price, and currency identifiers.
-
-Calendar lifecycle methods support event creation, cancellation, deletion, and rescheduling.
-
-Before final booking confirmation, the selected slot is checked against fresh free/busy data to reduce stale-slot collisions.
-
-## Business hours
-
-Tenant.businessHours uses weekday keys where 0 is Sunday and 6 is Saturday.
-
-```json
 {
-  "0": null,
-  "1": { "open": "09:00", "close": "19:00" },
-  "2": { "open": "09:00", "close": "19:00" },
-  "3": { "open": "09:00", "close": "19:00" },
-  "4": { "open": "09:00", "close": "19:00" },
-  "5": { "open": "14:00", "close": "19:00" },
-  "6": { "open": "10:00", "close": "16:00" }
+  "email": "admin@example.com",
+  "password": "your-password"
 }
 ```
 
-Tenant.bookingBufferMinutes defines the time buffer applied around existing Calendar busy intervals.
-
-## Automated seed
-
-Run:
-
-```bash
-npm install
-npm run seed
-```
-
-The seed creates or updates a demo Gulf Auto Detailing Center tenant and realistic demo services. Seed updates preserve existing Google and WhatsApp secrets unless explicit seed environment values are supplied.
-
-Prisma is configured with an idempotent seed command in package.json.
-
-## Database migrations
-
-A deployable baseline migration is stored in:
+Refresh:
 
 ```text
-prisma/migrations/20260919230000_init/migration.sql
+POST /api/v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "..."
+}
 ```
 
-Run locally:
+Access tokens are short-lived. Refresh tokens use a persisted session record with a SHA-256 token hash and single-use rotation.
 
-```bash
-npx prisma migrate dev
+Passwords are stored with bcrypt and never returned from APIs.
+
+## Admin API
+
+All admin endpoints require:
+
+```text
+Authorization: Bearer <access-token>
 ```
 
-Run in production:
+### Tenant
+
+```text
+POST  /api/v1/admin/tenants
+GET   /api/v1/admin/tenants/:tenantId
+PUT   /api/v1/admin/tenants/:tenantId
+PATCH /api/v1/admin/tenants/settings
+```
+
+The settings endpoint manages business hours, booking buffer, auto-quote configuration, WhatsApp credentials, and administrative notification phone.
+
+Sensitive credentials are accepted on write but are never serialized back to clients.
+
+### Services
+
+```text
+GET    /api/v1/admin/services
+POST   /api/v1/admin/services
+PUT    /api/v1/admin/services/:serviceId
+DELETE /api/v1/admin/services/:serviceId
+```
+
+Service deletion is a soft deactivation so historical bookings remain valid.
+
+### Analytics
+
+```text
+GET /api/v1/admin/analytics
+```
+
+Supported query parameters:
+
+```text
+tenantId
+from
+to
+```
+
+The response contains:
+
+- Revenue in minor currency units
+- Booking totals and status breakdown
+- Conversation funnel counts
+- Quote rate
+- Slot-stage rate
+- Booking conversion rate
+- Unique customers active in the last 30 days
+- Unique customers in the selected reporting window
+
+### Booking operations
+
+```text
+GET    /api/v1/admin/bookings
+PUT    /api/v1/admin/bookings/:bookingId
+DELETE /api/v1/admin/bookings/:bookingId
+```
+
+PUT supports status changes and manual rescheduling.
+
+For confirmed bookings, rescheduling first checks Calendar availability and then patches the existing Google Calendar event.
+
+DELETE performs cancellation and removes the Google Calendar event.
+
+Customer WhatsApp notifications are sent on confirmation, rescheduling, cancellation, and completion operations.
+
+## Internal API keys
+
+Internal service-to-service calls can use the configured API key header:
+
+```text
+x-api-key: <internal-key>
+```
+
+The key is stored only as a SHA-256 hash in PostgreSQL.
+
+Example protected endpoint:
+
+```text
+GET /api/v1/internal/ping
+```
+
+Tenant-scoped keys attach their tenant to the request context.
+
+## Structured logging
+
+Every request gets a correlation ID.
+
+Clients may supply:
+
+```text
+x-correlation-id: <id>
+```
+
+or the server generates one.
+
+The correlation ID is returned in:
+
+```text
+x-correlation-id
+```
+
+Pino emits structured JSON logs with service, environment, request method, path, correlation ID, status code, duration, and authenticated principal context.
+
+Secrets and credentials are redacted.
+
+## Error handling
+
+All errors terminate through a centralized Express error handler.
+
+Standard response shape:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Request validation failed"
+  },
+  "correlationId": "..."
+}
+```
+
+Handled categories include:
+
+- Application errors
+- Zod validation failures
+- Prisma unique conflicts
+- Prisma not-found errors
+- Database validation errors
+- Unhandled exceptions
+
+Internal stacks are never returned to clients.
+
+## HTTP hardening
+
+- Helmet enabled
+- CORS allowlist
+- Authentication rate limiting
+- Admin rate limiting
+- WhatsApp webhook rate limiting
+- Request body size limit
+- Correlation IDs
+- Graceful SIGINT and SIGTERM shutdown
+- Prisma connection teardown
+- Production environment validation
+
+Production requires a non-empty CORS allowlist.
+
+## Calendar
+
+Google Calendar supports:
+
+- Service Account JWT
+- Per-tenant OAuth2 refresh tokens
+- Environment-level OAuth2 fallback
+- Free/busy queries
+- Business hours
+- Booking buffers
+- Configurable slot intervals
+- Booking horizon
+- Event metadata
+- Cancellation
+- Rescheduling
+
+A fresh Calendar availability check is performed before customer-side booking confirmation.
+
+## Database
+
+Phase 3 adds:
+
+```text
+User
+RefreshSession
+ApiKey
+Tenant.autoQuoteParameters
+```
+
+Migration:
+
+```text
+prisma/migrations/20260919234000_phase3_auth/migration.sql
+```
+
+Deploy:
 
 ```bash
 npx prisma migrate deploy
 ```
 
-## Admin API
+## Seed
 
-All admin routes require an HTTP Bearer JWT signed with ADMIN_JWT_SECRET and a JWT claim:
-
-```json
-{
-  "role": "admin"
-}
+```bash
+npm run seed
 ```
 
-A tenant-scoped token may additionally include:
+The seed creates or updates a realistic Gulf Auto Detailing Center tenant and demo services.
 
-```json
-{
-  "role": "admin",
-  "tenantId": "tenant-cuid"
-}
-```
-
-Tenant-scoped tokens cannot access another tenant.
-
-### Tenant management
+Optional authentication seed variables:
 
 ```text
-POST /api/v1/admin/tenants
-GET  /api/v1/admin/tenants/:tenantId
-PUT  /api/v1/admin/tenants/:tenantId
+SEED_SUPER_ADMIN_EMAIL
+SEED_SUPER_ADMIN_PASSWORD
+SEED_TENANT_ADMIN_EMAIL
+SEED_TENANT_ADMIN_PASSWORD
+SEED_INTERNAL_API_KEY
 ```
 
-Tenant credentials are accepted by the write endpoints but never returned by the API.
+Passwords and API keys should only be supplied through secure environment configuration.
 
-### Service management
+## CI
+
+GitHub Actions runs on main and pull requests:
 
 ```text
-GET    /api/v1/admin/services?tenantId=:tenantId
-POST   /api/v1/admin/services
-PUT    /api/v1/admin/services/:serviceId?tenantId=:tenantId
-DELETE /api/v1/admin/services/:serviceId?tenantId=:tenantId
+npm install
+npx prisma validate
+npx prisma generate
+npm run build
 ```
 
-DELETE deactivates a service rather than physically removing historical service references.
-
-### Booking management
-
-```text
-GET  /api/v1/admin/bookings?tenantId=:tenantId
-POST /api/v1/admin/bookings/:bookingId/cancel
-```
-
-Booking queries support status, from, to, limit, and offset filters.
-
-Cancellation removes the Google Calendar event before atomically transitioning the booking from PENDING or CONFIRMED to CANCELLED.
-
-## Health
-
-```text
-GET /health
-```
-
-The health endpoint checks PostgreSQL with a lightweight query and returns HTTP 503 when the database is unavailable.
-
-## Environment
-
-Copy .env.example to .env and provide:
+## Required production configuration
 
 ```text
 DATABASE_URL
 ADMIN_JWT_SECRET
+JWT_ISSUER
+JWT_AUDIENCE
+CORS_ORIGINS
 META_GRAPH_API_VERSION
 ```
 
-Google OAuth variables are optional and must be supplied as a complete set when used.
-
-Tenant-specific Google and WhatsApp credentials are managed through the admin API or seed environment variables.
+Never commit .env files or real WhatsApp, Google, JWT, password, or API-key secrets.
