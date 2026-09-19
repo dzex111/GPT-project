@@ -1,5 +1,5 @@
 [build]
-  command = "npx prisma migrate deploy && npm run build"
+  command = "connection=$(node -e \"process.stdout.write(require('@netlify/database').getConnectionString())\") && DATABASE_URL=\"$connection\" DIRECT_URL=\"$connection\" npx prisma migrate deploy && npm run build"
   publish = "."
 
 [build.environment]
