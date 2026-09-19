@@ -56,6 +56,16 @@ export class BookingRepository {
     });
   }
 
+  findById(bookingId: string) {
+    return prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        service: true,
+        tenant: true
+      }
+    });
+  }
+
   findByIdForTenant(tenantId: string, bookingId: string) {
     return prisma.booking.findFirst({
       where: {
@@ -63,7 +73,8 @@ export class BookingRepository {
         tenantId
       },
       include: {
-        service: true
+        service: true,
+        tenant: true
       }
     });
   }
