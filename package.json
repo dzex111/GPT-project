@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "prisma generate && tsc -p tsconfig.json",
+    "build": "npx prisma migrate deploy && prisma generate && tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "seed": "prisma db seed",
     "prisma:generate": "prisma generate",
@@ -20,6 +20,7 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@netlify/database": "^1.0.0",
     "@prisma/client": "^6.16.2",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
