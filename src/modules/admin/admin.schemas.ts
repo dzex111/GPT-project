@@ -32,7 +32,7 @@ export const serviceParametersSchema = z.object({
   pricingRules: z.array(pricingRuleSchema).default([])
 });
 
-export const createTenantSchema = z.object({
+const tenantFieldsSchema = z.object({
   businessName: z.string().trim().min(2).max(160),
   businessType: z.string().trim().min(2).max(80),
   countryCode: z.string().trim().regex(/^[A-Z]{2}$/),
@@ -52,7 +52,12 @@ export const createTenantSchema = z.object({
   bookingBufferMinutes: z.number().int().min(0).max(240).default(15),
   adminNotificationPhone: z.string().trim().min(8).max(32).optional(),
   businessHours: businessHoursSchema.optional()
-}).superRefine((value, context) => {
+});
+
+function validateGoogleConfiguration(
+  value: Partial<z.infer<typeof tenantFieldsSchema>>,
+  context: z.RefinementCtx
+) {
   const serviceAccountCount = [
     value.googleServiceAccountEmail,
     value.googleServiceAccountPrivateKey,
@@ -80,12 +85,17 @@ export const createTenantSchema = z.object({
       message: "Google OAuth configuration requires client id, client secret, and refresh token"
     });
   }
-});
+}
 
-export const updateTenantSchema = createTenantSchema.partial().omit({
-  phoneNumber: true,
-  whatsappPhoneNumberId: true
-});
+export const createTenantSchema = tenantFieldsSchema.superRefine(validateGoogleConfiguration);
+
+export const updateTenantSchema = tenantFieldsSchema
+  .partial()
+  .omit({
+    phoneNumber: true,
+    whatsappPhoneNumberId: true
+  })
+  .superRefine(validateGoogleConfiguration);
 
 export const createServiceSchema = z.object({
   tenantId: z.string().cuid(),
@@ -97,9 +107,9 @@ export const createServiceSchema = z.object({
   active: z.boolean().default(true)
 });
 
-export const updateServiceSchema = createServiceSchema.omit({
-  tenantId: true
-}).partial();
+export const updateServiceSchema = createServiceSchema
+  .omit({ tenantId: true })
+  .partial();
 
 export const bookingStatusSchema = z.enum([
   "PENDING",
