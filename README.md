@@ -16,6 +16,7 @@ src/
   integrations/
     whatsapp/
   modules/
+    admin/
     bookings/
     conversations/
     services/
@@ -26,43 +27,10 @@ src/
     handlers/
   types/
 prisma/
+  migrations/
   schema.prisma
+  seed.ts
 ```
-
-## Service parameters
-
-Each service can define fields and pricing rules through the Service.parameters JSON field.
-
-```json
-{
-  "fields": [
-    {
-      "key": "vehicleType",
-      "label": "Vehicle type",
-      "type": "select",
-      "required": true,
-      "options": [
-        { "value": "sedan", "label": "Sedan" },
-        { "value": "suv", "label": "SUV / 4x4" }
-      ]
-    }
-  ],
-  "pricingRules": [
-    {
-      "when": { "vehicleType": "suv" },
-      "type": "flat",
-      "amount": 2500
-    },
-    {
-      "when": { "vehicleType": "sedan" },
-      "type": "multiplier",
-      "amount": 1.1
-    }
-  ]
-}
-```
-
-Amounts are stored in minor currency units.
 
 ## Conversation flow
 
@@ -75,6 +43,28 @@ SERVICE_SELECTION
   -> BOOKED
 ```
 
+## Dynamic pricing
+
+Each service stores fields and pricing rules in Service.parameters.
+
+Amounts use integer minor currency units.
+
+## Calendar integration
+
+Google Calendar authentication supports:
+
+- Per-tenant service account JWT credentials
+- Per-tenant OAuth2 refresh token credentials
+- Optional environment-level OAuth2 fallback
+
+The calendar service queries Google free/busy data, applies tenant business hours, expands busy intervals by booking buffer time, and returns bookable slots.
+
+Confirmed bookings create Calendar events with customer data plus private metadata containing tenant, booking, service, customer phone, price, and currency identifiers.
+
+Calendar lifecycle methods support event creation, cancellation, deletion, and rescheduling.
+
+Before final booking confirmation, the selected slot is checked against fresh free/busy data to reduce stale-slot collisions.
+
 ## Business hours
 
 Tenant.businessHours uses weekday keys where 0 is Sunday and 6 is Saturday.
@@ -82,38 +72,121 @@ Tenant.businessHours uses weekday keys where 0 is Sunday and 6 is Saturday.
 ```json
 {
   "0": null,
-  "1": { "open": "09:00", "close": "18:00" },
-  "2": { "open": "09:00", "close": "18:00" },
-  "3": { "open": "09:00", "close": "18:00" },
-  "4": { "open": "09:00", "close": "18:00" },
-  "5": { "open": "09:00", "close": "18:00" },
+  "1": { "open": "09:00", "close": "19:00" },
+  "2": { "open": "09:00", "close": "19:00" },
+  "3": { "open": "09:00", "close": "19:00" },
+  "4": { "open": "09:00", "close": "19:00" },
+  "5": { "open": "14:00", "close": "19:00" },
   "6": { "open": "10:00", "close": "16:00" }
 }
 ```
 
-## Local setup
+Tenant.bookingBufferMinutes defines the time buffer applied around existing Calendar busy intervals.
+
+## Automated seed
+
+Run:
 
 ```bash
 npm install
-copy .env.example .env
-npx prisma generate
-npx prisma migrate dev --name init
-npm run build
-npm start
+npm run seed
 ```
 
-## HTTP endpoints
+The seed creates or updates a demo Gulf Auto Detailing Center tenant and realistic demo services. Seed updates preserve existing Google and WhatsApp secrets unless explicit seed environment values are supplied.
+
+Prisma is configured with an idempotent seed command in package.json.
+
+## Database migrations
+
+A deployable baseline migration is stored in:
 
 ```text
-GET  /health
-GET  /webhooks/whatsapp
-POST /webhooks/whatsapp
+prisma/migrations/20260919230000_init/migration.sql
 ```
 
-The WhatsApp webhook accepts Meta verification requests and signed inbound webhook payloads. Public webhook traffic is rate limited.
+Run locally:
 
-## Integrations
+```bash
+npx prisma migrate dev
+```
 
-Meta WhatsApp Cloud API is used for inbound webhook processing and outbound text messages.
+Run in production:
 
-Google Calendar is used for free-busy slot lookup and event creation. Tenant configuration supplies the calendar id, service-account identity, private key, timezone, and working hours.
+```bash
+npx prisma migrate deploy
+```
+
+## Admin API
+
+All admin routes require an HTTP Bearer JWT signed with ADMIN_JWT_SECRET and a JWT claim:
+
+```json
+{
+  "role": "admin"
+}
+```
+
+A tenant-scoped token may additionally include:
+
+```json
+{
+  "role": "admin",
+  "tenantId": "tenant-cuid"
+}
+```
+
+Tenant-scoped tokens cannot access another tenant.
+
+### Tenant management
+
+```text
+POST /api/v1/admin/tenants
+GET  /api/v1/admin/tenants/:tenantId
+PUT  /api/v1/admin/tenants/:tenantId
+```
+
+Tenant credentials are accepted by the write endpoints but never returned by the API.
+
+### Service management
+
+```text
+GET    /api/v1/admin/services?tenantId=:tenantId
+POST   /api/v1/admin/services
+PUT    /api/v1/admin/services/:serviceId?tenantId=:tenantId
+DELETE /api/v1/admin/services/:serviceId?tenantId=:tenantId
+```
+
+DELETE deactivates a service rather than physically removing historical service references.
+
+### Booking management
+
+```text
+GET  /api/v1/admin/bookings?tenantId=:tenantId
+POST /api/v1/admin/bookings/:bookingId/cancel
+```
+
+Booking queries support status, from, to, limit, and offset filters.
+
+Cancellation removes the Google Calendar event before atomically transitioning the booking from PENDING or CONFIRMED to CANCELLED.
+
+## Health
+
+```text
+GET /health
+```
+
+The health endpoint checks PostgreSQL with a lightweight query and returns HTTP 503 when the database is unavailable.
+
+## Environment
+
+Copy .env.example to .env and provide:
+
+```text
+DATABASE_URL
+ADMIN_JWT_SECRET
+META_GRAPH_API_VERSION
+```
+
+Google OAuth variables are optional and must be supplied as a complete set when used.
+
+Tenant-specific Google and WhatsApp credentials are managed through the admin API or seed environment variables.
