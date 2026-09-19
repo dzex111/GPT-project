@@ -67,6 +67,7 @@ export const createService = asyncHandler(async (request: Request, response: Res
 
 export const updateService = asyncHandler(async (request: Request, response: Response) => {
   const tenantId = resolveTenantId(request, asOptionalString(request.query.tenantId));
+  const serviceId = asRequiredString(request.params.serviceId, "serviceId");
   const parsed = updateServiceSchema.safeParse(request.body);
 
   if (!parsed.success) {
@@ -75,7 +76,7 @@ export const updateService = asyncHandler(async (request: Request, response: Res
 
   const existing = await services.findAnyByIdForTenant(
     tenantId,
-    request.params.serviceId
+    serviceId
   );
 
   if (!existing) {
@@ -117,7 +118,8 @@ export const updateService = asyncHandler(async (request: Request, response: Res
 
 export const deleteService = asyncHandler(async (request: Request, response: Response) => {
   const tenantId = resolveTenantId(request, asOptionalString(request.query.tenantId));
-  const result = await services.deleteForTenant(tenantId, request.params.serviceId);
+  const serviceId = asRequiredString(request.params.serviceId, "serviceId");
+  const result = await services.deleteForTenant(tenantId, serviceId);
 
   if (result.count !== 1) {
     throw new NotFoundError("Service not found");
@@ -128,4 +130,14 @@ export const deleteService = asyncHandler(async (request: Request, response: Res
 
 function asOptionalString(value: unknown) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function asRequiredString(value: unknown, field: string) {
+  const result = asOptionalString(value);
+
+  if (!result) {
+    throw new ValidationError(`Invalid ${field}`);
+  }
+
+  return result;
 }
