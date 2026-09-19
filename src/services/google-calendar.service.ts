@@ -238,6 +238,22 @@ export class GoogleCalendarService implements CalendarService {
     }
 
     if (
+      env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
+      env.GOOGLE_PRIVATE_KEY
+    ) {
+      const auth = new google.auth.JWT({
+        email: env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        key: env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+        scopes: ["https://www.googleapis.com/auth/calendar"]
+      });
+
+      return google.calendar({
+        version: "v3",
+        auth
+      });
+    }
+
+    if (
       tenant.googleOAuthClientId &&
       tenant.googleOAuthClientSecret &&
       tenant.googleOAuthRefreshToken
