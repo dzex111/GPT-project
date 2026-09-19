@@ -32,7 +32,7 @@ model Tenant {
   whatsappPhoneNumberId         String             @unique
   whatsappAccessToken           String
   whatsappVerifyToken           String             @unique
-  whatsappAppSecret             String?
+  whatsappAppSecret             String
   googleCalendarId              String?
   googleServiceAccountEmail     String?
   googleServiceAccountPrivateKey String?
@@ -44,7 +44,7 @@ model Tenant {
   updatedAt                     DateTime           @updatedAt
   services                      Service[]
   bookings                      Booking[]
-  conversations                ConversationState[]
+  conversations                 ConversationState[]
 
   @@index([businessType])
   @@index([countryCode])
