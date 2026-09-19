@@ -77,14 +77,17 @@ export class GoogleCalendarService implements CalendarService {
       const close = this.parseLocalTime(day, config.close);
       let cursor = open;
 
-      while (cursor.plus({ minutes: durationMinutes }) <= close && slots.length < limit) {
+      while (
+        cursor.plus({ minutes: durationMinutes }).toMillis() <= close.toMillis() &&
+        slots.length < limit
+      ) {
         const slotStart = cursor.toUTC().toMillis();
         const slotEnd = cursor.plus({ minutes: durationMinutes }).toUTC().toMillis();
         const intersectsBusy = busyIntervals.some(interval =>
           slotStart < interval.end && slotEnd > interval.start
         );
 
-        if (!intersectsBusy && cursor > now) {
+        if (!intersectsBusy && cursor.toMillis() > now.toMillis()) {
           const start = cursor.toUTC().toISO();
           const end = cursor.plus({ minutes: durationMinutes }).toUTC().toISO();
 
@@ -172,19 +175,23 @@ export class GoogleCalendarService implements CalendarService {
     if (!tenant.googleCalendarId) {
       throw new AppError(500, "CALENDAR_CONFIGURATION_ERROR", "Google Calendar is not configured");
     }
+
     return tenant.googleCalendarId;
   }
 
   private getBusinessHours(tenant: Tenant) {
     const parsed = businessHoursSchema.safeParse(tenant.businessHours ?? {});
+
     if (!parsed.success) {
       throw new AppError(500, "BUSINESS_HOURS_CONFIGURATION_ERROR", "Business hours configuration is invalid");
     }
+
     return parsed.data;
   }
 
   private parseLocalTime(day: DateTime, value: string) {
     const [hour, minute] = value.split(":").map(Number);
+
     return day.set({
       hour,
       minute,
