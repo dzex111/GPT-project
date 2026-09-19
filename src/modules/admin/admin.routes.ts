@@ -1,12 +1,14 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { env } from "../../config/env";
-import { requireAdmin } from "./admin-auth.middleware";
+import { requireAuth } from "../auth/auth.middleware";
+import { allowRoles } from "../auth/role.middleware";
 import {
   createTenant,
   getTenant,
   updateTenant
 } from "./tenant-admin.controller";
+import { updateTenantSettings } from "./tenant-settings.controller";
 import {
   createService,
   deleteService,
@@ -15,8 +17,10 @@ import {
 } from "./service-admin.controller";
 import {
   cancelBooking,
-  listBookings
+  listBookings,
+  updateBooking
 } from "./booking-admin.controller";
+import { getAnalytics } from "./analytics.controller";
 
 export const adminRouter = Router();
 
@@ -29,16 +33,23 @@ adminRouter.use(
   })
 );
 
-adminRouter.use(requireAdmin);
+adminRouter.use(requireAuth);
 
-adminRouter.post("/tenants", createTenant);
-adminRouter.get("/tenants/:tenantId", getTenant);
-adminRouter.put("/tenants/:tenantId", updateTenant);
+adminRouter.post("/tenants", allowRoles("SUPER_ADMIN"), createTenant);
+adminRouter.get("/tenants/:tenantId", allowRoles("SUPER_ADMIN", "TENANT_ADMIN"), getTenant);
+adminRouter.put("/tenants/:tenantId", allowRoles("SUPER_ADMIN", "TENANT_ADMIN"), updateTenant);
+adminRouter.patch(
+  "/tenants/settings",
+  allowRoles("SUPER_ADMIN", "TENANT_ADMIN"),
+  updateTenantSettings
+);
 
-adminRouter.get("/services", listServices);
-adminRouter.post("/services", createService);
-adminRouter.put("/services/:serviceId", updateService);
-adminRouter.delete("/services/:serviceId", deleteService);
+adminRouter.get("/services", allowRoles("SUPER_ADMIN", "TENANT_ADMIN"), listServices);
+adminRouter.post("/services", allowRoles("SUPER_ADMIN", "TENANT_ADMIN"), createService);
+adminRouter.put("/services/:serviceId", allowRoles("SUPER_ADMIN", "TENANT_ADMIN"), updateService);
+adminRouter.delete("/services/:serviceId", allowRoles("SUPER_ADMIN", "TENANT_ADMIN"), deleteService);
 
-adminRouter.get("/bookings", listBookings);
-adminRouter.post("/bookings/:bookingId/cancel", cancelBooking);
+adminRouter.get("/analytics", allowRoles("SUPER_ADMIN", "TENANT_ADMIN"), getAnalytics);
+adminRouter.get("/bookings", allowRoles("SUPER_ADMIN", "TENANT_ADMIN"), listBookings);
+adminRouter.put("/bookings/:bookingId", allowRoles("SUPER_ADMIN", "TENANT_ADMIN"), updateBooking);
+adminRouter.delete("/bookings/:bookingId", allowRoles("SUPER_ADMIN", "TENANT_ADMIN"), cancelBooking);
