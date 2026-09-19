@@ -54,7 +54,8 @@ export const updateBooking = asyncHandler(async (request: Request, response: Res
   }
 
   const tenantId = resolveTenantId(request, asOptionalString(request.query.tenantId));
-  const booking = await bookings.findByIdForTenant(tenantId, request.params.bookingId);
+  const bookingId = asRequiredString(request.params.bookingId, "bookingId");
+  const booking = await bookings.findByIdForTenant(tenantId, bookingId);
 
   if (!booking) {
     throw new NotFoundError("Booking not found");
@@ -130,7 +131,8 @@ export const updateBooking = asyncHandler(async (request: Request, response: Res
 
 export const cancelBooking = asyncHandler(async (request: Request, response: Response) => {
   const tenantId = resolveTenantId(request, asOptionalString(request.query.tenantId));
-  const booking = await bookings.findByIdForTenant(tenantId, request.params.bookingId);
+  const bookingId = asRequiredString(request.params.bookingId, "bookingId");
+  const booking = await bookings.findByIdForTenant(tenantId, bookingId);
 
   if (!booking) {
     throw new NotFoundError("Booking not found");
@@ -410,4 +412,14 @@ function parseNonNegativeInteger(value: unknown, fallback: number, max: number) 
 
 function asOptionalString(value: unknown) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function asRequiredString(value: unknown, field: string) {
+  const result = asOptionalString(value);
+
+  if (!result) {
+    throw new ValidationError(`Invalid ${field}`);
+  }
+
+  return result;
 }
