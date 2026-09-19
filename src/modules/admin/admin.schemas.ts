@@ -96,6 +96,29 @@ export const updateTenantSchema = tenantFieldsSchema
   })
   .superRefine(validateGoogleConfiguration);
 
+export const updateTenantSettingsSchema = z.object({
+  tenantId: z.string().cuid().optional(),
+  businessHours: businessHoursSchema.optional(),
+  bookingBufferMinutes: z.number().int().min(0).max(240).optional(),
+  autoQuoteParameters: z.record(z.string(), z.unknown()).optional(),
+  whatsappPhoneNumberId: z.string().trim().min(1).max(128).optional(),
+  whatsappAccessToken: z.string().min(1).optional(),
+  whatsappVerifyToken: z.string().min(1).max(255).optional(),
+  whatsappAppSecret: z.string().min(1).optional(),
+  adminNotificationPhone: z.string().trim().min(8).max(32).optional()
+}).superRefine((value, context) => {
+  if (
+    value.whatsappPhoneNumberId !== undefined &&
+    value.whatsappAccessToken === undefined
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["whatsappAccessToken"],
+      message: "WhatsApp access token is required when changing the phone number id"
+    });
+  }
+});
+
 export const createServiceSchema = z.object({
   tenantId: z.string().cuid(),
   name: z.string().trim().min(2).max(160),
@@ -116,3 +139,25 @@ export const bookingStatusSchema = z.enum([
   "CANCELLED",
   "COMPLETED"
 ]);
+
+export const updateBookingSchema = z.object({
+  status: bookingStatusSchema.optional(),
+  startAt: z.string().datetime().optional(),
+  endAt: z.string().datetime().optional()
+}).superRefine((value, context) => {
+  if ((value.startAt === undefined) !== (value.endAt === undefined)) {
+    context.addIssue({
+      code: "custom",
+      path: ["startAt"],
+      message: "startAt and endAt must be provided together"
+    });
+  }
+
+  if (value.startAt && value.endAt && new Date(value.startAt) >= new Date(value.endAt)) {
+    context.addIssue({
+      code: "custom",
+      path: ["endAt"],
+      message: "endAt must be after startAt"
+    });
+  }
+});
