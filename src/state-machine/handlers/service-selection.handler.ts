@@ -1,5 +1,6 @@
 import type { Service } from "@prisma/client";
 import type { StateMachineContext } from "../types";
+import { handleQuoting } from "./quoting.handler";
 
 export async function handleServiceSelection(context: StateMachineContext) {
   const services = await context.services.listActive(context.tenant.id);
@@ -54,7 +55,13 @@ export async function handleServiceSelection(context: StateMachineContext) {
       recipientPhone: context.message.from,
       text: `${firstRequiredField.label} is required. Please reply with ${options || "your answer"}.`
     });
+    return updated;
   }
+
+  await handleQuoting({
+    ...context,
+    conversation: updated
+  });
 
   return updated;
 }
