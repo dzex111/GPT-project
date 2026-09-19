@@ -41,6 +41,7 @@ export class AuthService {
     }
 
     await this.repository.updateLastLogin(user.id);
+
     return this.issueTokens({
       userId: user.id,
       role: user.role,
@@ -69,12 +70,19 @@ export class AuthService {
       throw new UnauthorizedError("Invalid refresh token");
     }
 
-    if (claims.type !== "refresh" || typeof claims.sub !== "string" || typeof claims.jti !== "string") {
+    if (
+      claims.type !== "refresh" ||
+      typeof claims.sub !== "string" ||
+      typeof claims.jti !== "string"
+    ) {
       throw new UnauthorizedError("Invalid refresh token");
     }
 
     const tokenHash = this.hashToken(refreshToken);
-    const session = await this.repository.findActiveRefreshSession(claims.jti, tokenHash);
+    const session = await this.repository.findActiveRefreshSession(
+      claims.jti,
+      tokenHash
+    );
 
     if (!session || !session.user.active) {
       throw new UnauthorizedError("Invalid refresh token");
@@ -93,14 +101,14 @@ export class AuthService {
     };
 
     const next = this.buildTokenPair(principal);
-    const sessionResult = await this.repository.rotateRefreshSession(session.id, {
+    const rotated = await this.repository.rotateRefreshSession(session.id, {
       userId: principal.userId,
       jti: next.refreshJti,
       tokenHash: this.hashToken(next.refreshToken),
       expiresAt: next.refreshExpiresAt
     });
 
-    if (!sessionResult) {
+    if (!rotated) {
       throw new UnauthorizedError("Refresh token already used");
     }
 
@@ -139,7 +147,7 @@ export class AuthService {
         issuer: env.JWT_ISSUER,
         audience: env.JWT_AUDIENCE,
         subject: principal.userId,
-        expiresIn: env.ACCESS_TOKEN_TTL
+        expiresIn: env.ACCESS_TOKEN_TTL as jwt.SignOptions["expiresIn"]
       }
     );
 
@@ -157,7 +165,7 @@ export class AuthService {
         audience: env.JWT_AUDIENCE,
         subject: principal.userId,
         jwtid: refreshJti,
-        expiresIn: env.REFRESH_TOKEN_TTL
+        expiresIn: env.REFRESH_TOKEN_TTL as jwt.SignOptions["expiresIn"]
       }
     );
 
