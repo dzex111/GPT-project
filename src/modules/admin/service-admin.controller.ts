@@ -7,6 +7,7 @@ import {
   ValidationError
 } from "../../http/errors";
 import { ServiceRepository } from "../services/service.repository";
+import { TenantRepository } from "../tenants/tenant.repository";
 import { resolveTenantId } from "./admin-scope";
 import {
   createServiceSchema,
@@ -14,9 +15,16 @@ import {
 } from "./admin.schemas";
 
 const services = new ServiceRepository();
+const tenants = new TenantRepository();
 
 export const listServices = asyncHandler(async (request: Request, response: Response) => {
   const tenantId = resolveTenantId(request, asOptionalString(request.query.tenantId));
+  const tenant = await tenants.findById(tenantId);
+
+  if (!tenant) {
+    throw new NotFoundError("Tenant not found");
+  }
+
   const result = await services.listForTenant(tenantId);
 
   response.json({
@@ -32,12 +40,17 @@ export const createService = asyncHandler(async (request: Request, response: Res
   }
 
   const tenantId = resolveTenantId(request, parsed.data.tenantId);
+  const tenant = await tenants.findById(tenantId);
+
+  if (!tenant) {
+    throw new NotFoundError("Tenant not found");
+  }
 
   try {
     const service = await services.create({
       ...parsed.data,
       tenantId,
-      parameters: parsed.data.parameters
+      parameters: parsed.data.parameters as Prisma.InputJsonValue
     });
 
     response.status(201).json({
@@ -53,6 +66,7 @@ export const createService = asyncHandler(async (request: Request, response: Res
 });
 
 export const updateService = asyncHandler(async (request: Request, response: Response) => {
+  const tenantId = resolveTenantId(request, asOptionalString(request.query.tenantId));
   const parsed = updateServiceSchema.safeParse(request.body);
 
   if (!parsed.success) {
@@ -60,7 +74,7 @@ export const updateService = asyncHandler(async (request: Request, response: Res
   }
 
   const existing = await services.findAnyByIdForTenant(
-    resolveTenantId(request, asOptionalString(request.query.tenantId)),
+    tenantId,
     request.params.serviceId
   );
 
@@ -69,9 +83,14 @@ export const updateService = asyncHandler(async (request: Request, response: Res
   }
 
   const result = await services.updateForTenant(
-    existing.tenantId,
+    tenantId,
     existing.id,
-    parsed.data
+    {
+      ...parsed.data,
+      ...(parsed.data.parameters
+        ? { parameters: parsed.data.parameters as Prisma.InputJsonValue }
+        : {})
+    }
   );
 
   if (result.count !== 1) {
@@ -79,7 +98,7 @@ export const updateService = asyncHandler(async (request: Request, response: Res
   }
 
   const updated = await services.findAnyByIdForTenant(
-    existing.tenantId,
+    tenantId,
     existing.id
   );
 
