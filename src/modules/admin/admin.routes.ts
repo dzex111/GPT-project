@@ -1,7 +1,6 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { env } from "../../config/env";
-import { asyncHandler } from "../../http/async-handler";
 import { requireAdmin } from "./admin-auth.middleware";
 import {
   createTenant,
@@ -42,7 +41,4 @@ adminRouter.put("/services/:serviceId", updateService);
 adminRouter.delete("/services/:serviceId", deleteService);
 
 adminRouter.get("/bookings", listBookings);
-adminRouter.post(
-  "/bookings/:bookingId/cancel",
-  asyncHandler(cancelBooking)
-);
+adminRouter.post("/bookings/:bookingId/cancel", cancelBooking);
