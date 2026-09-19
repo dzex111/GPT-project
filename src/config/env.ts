@@ -7,7 +7,7 @@ const resolvedDatabaseUrl = process.env.DATABASE_URL ?? process.env.NETLIFY_DB_U
 process.env.DATABASE_URL = resolvedDatabaseUrl;
 process.env.DIRECT_URL = process.env.DIRECT_URL ?? resolvedDatabaseUrl;
 
-const fallbackJwtSecret = process.env.JWT_SECRET ?? process.env.ADMIN_JWT_SECRET ?? crypto.createHash("sha256").update(resolvedDatabaseUrl).digest("hex");
+const fallbackJwtSecret = process.env.JWT_SECRET ?? process.env.ADMIN_JWT_SECRET ?? crypto.createHash("sha256").update(`gcc-booking-engine:${resolvedDatabaseUrl}`).digest("hex");
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
