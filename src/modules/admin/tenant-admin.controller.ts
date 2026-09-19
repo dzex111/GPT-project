@@ -31,7 +31,7 @@ export const createTenant = asyncHandler(async (request: Request, response: Resp
 });
 
 export const getTenant = asyncHandler(async (request: Request, response: Response) => {
-  const tenantId = resolveTenantId(request, request.params.tenantId);
+  const tenantId = resolveTenantId(request, asRequiredString(request.params.tenantId, "tenantId"));
   const tenant = await tenants.findById(tenantId);
 
   if (!tenant) {
@@ -44,7 +44,7 @@ export const getTenant = asyncHandler(async (request: Request, response: Respons
 });
 
 export const updateTenant = asyncHandler(async (request: Request, response: Response) => {
-  const tenantId = resolveTenantId(request, request.params.tenantId);
+  const tenantId = resolveTenantId(request, asRequiredString(request.params.tenantId, "tenantId"));
   const parsed = updateTenantSchema.safeParse(request.body);
 
   if (!parsed.success) {
@@ -97,4 +97,18 @@ function mapPrismaError(error: unknown) {
   }
 
   return error;
+}
+
+function asOptionalString(value: unknown) {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function asRequiredString(value: unknown, field: string) {
+  const result = asOptionalString(value);
+
+  if (!result) {
+    throw new ValidationError(`Invalid ${field}`);
+  }
+
+  return result;
 }
