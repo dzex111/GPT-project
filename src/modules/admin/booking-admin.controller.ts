@@ -231,6 +231,16 @@ async function applyStatusChange(
   }
 
   if (nextStatus === "CONFIRMED" && booking.status === "PENDING") {
+    const slotAvailable = await isSlotAvailable(
+      booking,
+      booking.startAt,
+      booking.endAt
+    );
+
+    if (!slotAvailable) {
+      throw new ConflictError("The pending booking slot is no longer available");
+    }
+
     const eventId = await calendar.createBookingEvent({
       tenant: booking.tenant,
       bookingId: booking.id,
