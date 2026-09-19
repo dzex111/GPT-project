@@ -1,0 +1,19 @@
+name: Netlify Runtime Fix Deploy
+
+on:
+  push:
+    branches:
+      - temp/netlify-runtime-fix
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npx -y @netlify/mcp@latest --site-id 72599492-3fcb-4604-bdd8-a5ef8324f2f0 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..5G5RGXrzQLkLY8Fh.sjmpTP-he3Keee0UFL-rkce7tH6kkUcQL_JjorVMqU5S-C19BsUnonFuY1dzABAhvam79mrnfQ-idYsGNpriFWzvNnCl0wppplaEq0OnZflIRZiul6tdKzKTvq90TbzewLBw1jXRPs_7MhPU9YHbUXqUJx2uaih7WzlweFNkUp2xEK5Zb-ro_53Ar2oKtti_qq1sDIQVly2jEr16R9RIu5z5FA3TkpD3yeHoGZv7CAF9vXNn7MConEmySZ4f9NefyXSiySBWxr1THY5QN72eG8f_JpUw1ckP1emov50tg3oRq4NEgZ31TGrdpbHk7olIgD76qvoyiVDfwFP-k0ruP_1NT55br3nMfCq8oyrrzDzW_dmuHlQX-FNcvDz5VdyDpI37iOEF.OnHILs9KmL02qRmg1sUUEg"
