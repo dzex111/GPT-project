@@ -2,8 +2,11 @@ import express from "express";
 import rateLimit from "express-rate-limit";
 import { env } from "./config/env";
 import { logger } from "./config/logger";
+import { prisma } from "./config/prisma";
 import { AppError } from "./http/errors";
 import { whatsappRouter } from "./routes/whatsapp.routes";
+import { adminRouter } from "./modules/admin/admin.routes";
+import { asyncHandler } from "./http/async-handler";
 
 export const app = express();
 
@@ -16,9 +19,24 @@ app.use(express.json({
   }
 }));
 
-app.get("/health", (_request, response) => {
-  response.status(200).json({ status: "ok" });
-});
+app.get(
+  "/health",
+  asyncHandler(async (_request, response) => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      response.status(200).json({
+        status: "ok",
+        database: "ok"
+      });
+    } catch (error) {
+      logger.error({ err: error }, "Database health check failed");
+      response.status(503).json({
+        status: "degraded",
+        database: "unavailable"
+      });
+    }
+  })
+);
 
 app.use(
   "/webhooks/whatsapp",
@@ -30,6 +48,8 @@ app.use(
   }),
   whatsappRouter
 );
+
+app.use("/api/v1/admin", adminRouter);
 
 app.use((error: unknown, _request: express.Request, response: express.Response, _next: express.NextFunction) => {
   if (error instanceof AppError) {
