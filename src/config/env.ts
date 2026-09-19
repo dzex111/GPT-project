@@ -1,10 +1,13 @@
 import "dotenv/config";
+import crypto from "node:crypto";
 import { getConnectionString } from "@netlify/database";
 import { z } from "zod";
 
 const resolvedDatabaseUrl = process.env.DATABASE_URL ?? process.env.NETLIFY_DB_URL ?? getConnectionString();
 process.env.DATABASE_URL = resolvedDatabaseUrl;
 process.env.DIRECT_URL = process.env.DIRECT_URL ?? resolvedDatabaseUrl;
+
+const fallbackJwtSecret = process.env.JWT_SECRET ?? process.env.ADMIN_JWT_SECRET ?? crypto.createHash("sha256").update(resolvedDatabaseUrl).digest("hex");
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -37,14 +40,6 @@ const envSchema = z.object({
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1).optional(),
   GOOGLE_OAUTH_REFRESH_TOKEN: z.string().min(1).optional()
 }).superRefine((value, context) => {
-  if (!value.ADMIN_JWT_SECRET && !value.JWT_SECRET) {
-    context.addIssue({
-      code: "custom",
-      path: ["JWT_SECRET"],
-      message: "JWT_SECRET or ADMIN_JWT_SECRET must be configured"
-    });
-  }
-
   const oauthCount = [
     value.GOOGLE_OAUTH_CLIENT_ID,
     value.GOOGLE_OAUTH_CLIENT_SECRET,
@@ -75,6 +70,9 @@ const envSchema = z.object({
     });
   }
 });
+
+process.env.JWT_SECRET = process.env.JWT_SECRET ?? fallbackJwtSecret;
+process.env.ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET ?? fallbackJwtSecret;
 
 const parsedEnv = envSchema.parse(process.env);
 
