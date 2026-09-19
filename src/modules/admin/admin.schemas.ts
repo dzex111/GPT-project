@@ -92,8 +92,7 @@ export const createTenantSchema = tenantFieldsSchema.superRefine(validateGoogleC
 export const updateTenantSchema = tenantFieldsSchema
   .partial()
   .omit({
-    phoneNumber: true,
-    whatsappPhoneNumberId: true
+    phoneNumber: true
   })
   .superRefine(validateGoogleConfiguration);
 
