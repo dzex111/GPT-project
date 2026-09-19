@@ -1,4 +1,5 @@
 import "express-serve-static-core";
+import "http";
 import type { Logger } from "pino";
 
 export type AuthPrincipal = {
@@ -13,5 +14,11 @@ declare module "express-serve-static-core" {
     correlationId?: string;
     log?: Logger;
     auth?: AuthPrincipal;
+  }
+}
+
+declare module "http" {
+  interface IncomingMessage {
+    rawBody?: Buffer;
   }
 }
