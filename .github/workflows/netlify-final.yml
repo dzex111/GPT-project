@@ -1,0 +1,19 @@
+name: Temporary Netlify Final
+
+on:
+  push:
+    branches:
+      - temp/netlify-final
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npx -y @netlify/mcp@latest --site-id 72599492-3fcb-4604-bdd8-a5ef8324f2f0 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..95eVSoJROefEjwYy.x36fZzTTLAyFXopvzE5koahOQl3QJS3ee8Y3awLbbR-e4aax5KMIxhqjKqEQH8qXL-vD-6gEFCxx99Aoa6h-779oiTrMC8tH2g1woic8ffmE890tPaVa4WRgViuFZS5NMXSidxw5sA4CQMkEu9RNbIpdUXRqxYvxFK4jaXMtmcaMzbj1A3OpQwUSE3FDdijSUSR4g1P7vtoHj_xgDAwnq1IaJkuAe1R-MuCT4VSJ4SIfHCU-0EmH4k9LWJEF69ztUbgyd_-uEpK_jjMOoLza3UrFCW6BHxqOVgqkaHevYGVEpRkDCmi9BxVHt4zKfyGFjz_n3XNF7Afj1Ot77AIRCZvPrjAcuoxWLB6w--WwncdswRtAhR8FqF23z2Sjj2IXIaLSTWqq.QsC16OJ-vHoJ9Z9ohnDMTg"
